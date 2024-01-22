@@ -32,6 +32,10 @@ class Player {
   initSocketToPlay(onMessage: (message: unknown) => void) {
     this.socket.on('message', onMessage);
   }
+
+  handleDisconnect(onDisconnect: () => void) {
+    this.socket.on('disconnect', onDisconnect);
+  }
 }
 
 class MorpioGame {
@@ -43,6 +47,15 @@ class MorpioGame {
   private grid: CellValue[][];
   private turn: number = 1;
   private readonly winCondition: number = 3;
+  private _onGameClose: () => void;
+
+  public get onGameClose(): () => void {
+    return this._onGameClose;
+  }
+
+  public set onGameClose(value: () => void) {
+    this._onGameClose = value;
+  }
 
   constructor(creator: Socket, maxPlayers: number = 2, gridSize: number = 3) {
     this.maxPlayers = maxPlayers;
@@ -216,6 +229,10 @@ class MorpioGame {
       player.initSocketToPlay((message) =>
         this.handlePlayerEvent(player, message),
       );
+      player.handleDisconnect(() => {
+        if (this.players.length == 0) {
+        }
+      });
     });
   }
 }
@@ -226,12 +243,17 @@ export class MorpioGameService {
 
   createLobby(player1: Socket): string {
     const game = new MorpioGame(player1);
+    game.onGameClose = () => this.onGameClose(game);
     this.games.push(game);
     return game.id;
   }
 
   private getGameById(id: string): MorpioGame {
     return this.games.find((game) => game.id === id);
+  }
+
+  private onGameClose(game: MorpioGame) {
+    this.games.splice(this.games.indexOf(game), 1);
   }
 
   joinLobby(player: Socket, lobbyId: string) {
